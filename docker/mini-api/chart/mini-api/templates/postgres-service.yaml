@@ -1,0 +1,15 @@
+# =============================================================================
+# templates/postgres-service.yaml — Template Helm pour le Service PostgreSQL
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres
+  clusterIP: None

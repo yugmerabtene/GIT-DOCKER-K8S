@@ -1,0 +1,49 @@
+# =============================================================================
+# ingress.yaml — Ingress pour exposer l'API depuis l'exterieur
+# =============================================================================
+#
+# OBJECTIF : Exposer l'API via HTTP avec un nom de domaine.
+#
+# INGRESS :
+# - Route le trafic HTTP/HTTPS vers les Services
+# - Necessite un Ingress Controller (NGINX, Traefik, etc.)
+# - Peut gerer le TLS (certificats)
+#
+# RESULTAT ATTENDU :
+#   kubectl get ingress mini -n demo  # Doit afficher l'Ingress avec ADDRESS
+#   curl -H "Host: mini.local" http://<ingress-ip>/health
+#   # Doit retourner {"status":"ok"}
+#
+# PRE-REQUIS :
+#   - Ingress Controller installe (NGINX, Traefik, etc.)
+#   - Ajouter <ingress-ip> mini.local dans /etc/hosts
+#
+# USAGE :
+#   kubectl apply -f ingress.yaml -n demo
+#
+# TEST :
+#   # Avec Minikube :
+#   minikube tunnel  # Expose les Ingress
+#   curl http://mini.local/health
+# =============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mini
+  namespace: demo
+  annotations:
+    # Annotation pour NGINX Ingress Controller
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - host: mini.local  # Nom de domaine (ajouter dans /etc/hosts)
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 80

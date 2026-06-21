@@ -1,0 +1,30 @@
+# =============================================================================
+# compose.logging.yaml — Configuration de centralisation des logs
+# =============================================================================
+#
+# OBJECTIF : Centraliser les logs Docker avec Fluent Bit.
+#
+# ARCHITECTURE :
+#   [Conteneurs] → /var/lib/docker/containers → [Fluent Bit] → [Destination]
+#
+# RESULTAT ATTENDU :
+#   - Fluent Bit collecte les logs de tous les conteneurs
+#   - Logs disponibles sur le port 24224 (Forward protocol)
+#
+# USAGE :
+#   docker compose -f compose.logging.yaml up -d
+#
+# PERSONNALISATION :
+#   - Configurer fluent-bit.conf pour envoyer vers Elasticsearch, Loki, etc.
+# =============================================================================
+
+services:
+  fluentbit:
+    image: cr.fluentbit.io/fluent/fluent-bit:2
+    volumes:
+      # Montage des logs Docker en lecture seule
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # Configuration Fluent Bit (a creer)
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+    ports:
+      - "24224:24224"  # Port Forward pour recevoir les logs

@@ -1,0 +1,10 @@
+# =============================================================================
+# templates/configmap.yaml — Template Helm pour le ConfigMap
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mini-config
+data:
+  DB_HOST: postgres

@@ -1,0 +1,100 @@
+# =============================================================================
+# api-deployment.yaml — Deployment pour l'API FastAPI
+# =============================================================================
+#
+# OBJECTIF : Deployer l'API avec :
+# - 2 replicas pour la haute disponibilite
+# - Injection des secrets et configmaps
+# - Probes de sante (readiness/liveness)
+# - Securite renforcee (non-root, read-only rootfs)
+#
+# RESULTAT ATTENDU :
+#   kubectl get deploy api -n demo  # Doit afficher 2/2 READY
+#   kubectl get pods -n demo -l app=mini,tier=api  # Doit afficher 2 pods Running
+#
+# USAGE :
+#   kubectl apply -f api-deployment.yaml -n demo
+#
+# VERIFICATION :
+#   kubectl logs -l app=mini,tier=api -n demo  # Logs de tous les replicas
+#   kubectl describe pod <pod-name> -n demo  # Details + events
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+  labels:
+    app: mini
+    tier: api
+spec:
+  replicas: 2  # 2 replicas pour la haute disponibilite
+  selector:
+    matchLabels:
+      app: mini
+      tier: api
+  template:
+    metadata:
+      labels:
+        app: mini
+        tier: api
+    spec:
+      containers:
+        - name: api
+          image: mini-api:1.0  # Remplacer par REG/mini-api@sha256:... en production
+          ports:
+            - containerPort: 8000
+          env:
+            # Injection des secrets
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mini-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mini-secrets
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: mini-secrets
+                  key: DB_NAME
+            # Injection du configmap
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: mini-config
+                  key: DB_HOST
+            # Construction de l'URL de connexion
+            # $(VAR) est remplace par la valeur de la variable d'environnement
+            - name: DATABASE_URL
+              value: "postgresql+psycopg2://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):5432/$(DB_NAME)"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: mini-secrets
+                  key: JWT_SECRET
+          # --- Readiness Probe ---
+          # Determine si le Pod est pret a recevoir du trafic
+          # Si echec : le Pod est retire du Service (pas de trafic)
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5   # Attends 5s avant la premiere verification
+            periodSeconds: 10        # Verification toutes les 10s
+          # --- Liveness Probe ---
+          # Determine si le Pod est vivant
+          # Si echec : le Pod est redemarre automatiquement
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15  # Attends 15s avant la premiere verification
+          # --- Securite ---
+          securityContext:
+            runAsNonRoot: true           # Oblige l'execution en non-root
+            readOnlyRootFilesystem: true # Systeme de fichiers en lecture seule

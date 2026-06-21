@@ -1,0 +1,32 @@
+# =============================================================================
+# security-hardening.compose.yaml — Configuration de securite renforcee
+# =============================================================================
+#
+# OBJECTIF : Durcir la securite du conteneur API avec :
+# - no-new-privileges : empeche l'escalade de privileges
+# - read_only : systeme de fichiers en lecture seule
+# - tmpfs : repertoires temporaires en memoire
+# - cap_drop ALL : supprime toutes les capabilities Linux
+# - cap_add NET_BIND_SERVICE : autorise uniquement l'ecoute sur ports < 1024
+#
+# RESULTAT ATTENDU :
+#   - Le conteneur ne peut pas obtenir de privileges root
+#   - Le systeme de fichiers est immuable (sauf /tmp et /run)
+#   - Les capabilities sont minimisees
+#
+# USAGE :
+#   docker compose -f compose.yaml -f security-hardening.compose.yaml up -d
+# =============================================================================
+
+services:
+  api:
+    security_opt:
+      - no-new-privileges:true  # Empeche setuid/setgid
+    read_only: true             # System de fichiers en lecture seule
+    tmpfs:
+      - /tmp                    # Fichiers temporaires en memoire
+      - /run                    # PID, sockets
+    cap_drop:
+      - ALL                     # Supprime toutes les capabilities
+    cap_add:
+      - NET_BIND_SERVICE        # Autorise uniquement l'ecoute sur ports privilegies

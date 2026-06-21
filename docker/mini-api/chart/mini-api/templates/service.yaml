@@ -1,0 +1,16 @@
+# =============================================================================
+# templates/service.yaml — Template Helm pour le Service API
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  selector:
+    app: mini
+    tier: api
+  ports:
+    - port: 80
+      targetPort: 8000
+  type: ClusterIP

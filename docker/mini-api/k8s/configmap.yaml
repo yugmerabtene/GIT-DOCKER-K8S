@@ -1,0 +1,27 @@
+# =============================================================================
+# configmap.yaml — Configuration non-sensible (nom du host PostgreSQL)
+# =============================================================================
+#
+# OBJECTIF : Stocker la configuration non-sensible utilisee par l'API.
+#
+# DIFFERENCE AVEC SECRET :
+# - ConfigMap : donnees non-sensibles (noms, URLs, configurations)
+# - Secret : donnees sensibles (mots de passe, cles, tokens)
+#
+# RESULTAT ATTENDU :
+#   kubectl get configmap mini-config -n demo  # Doit afficher le configmap
+#   kubectl get configmap mini-config -n demo -o yaml  # Affiche les donnees en clair
+#
+# USAGE :
+#   kubectl apply -f configmap.yaml -n demo
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mini-config
+  namespace: demo
+data:
+  # Nom du service Kubernetes pour PostgreSQL
+  # Correspond au metadata.name du Service PostgreSQL
+  DB_HOST: postgres

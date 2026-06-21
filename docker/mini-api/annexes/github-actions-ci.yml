@@ -1,0 +1,53 @@
+# =============================================================================
+# github-actions-ci.yml — Pipeline CI GitHub Actions
+# =============================================================================
+#
+# OBJECTIF : Construire et tester l'image Docker automatiquement a chaque push.
+#
+# FLUX :
+#   1. Checkout du code
+#   2. Setup Buildx (Docker BuildKit)
+#   3. Build de l'image Docker
+#   4. Test : demarrage du conteneur + verification de /health
+#
+# RESULTAT ATTENDU :
+#   - Image Docker construite avec succes
+#   - Endpoint /health retourne {"status":"ok"}
+#
+# PERSONNALISATION :
+#   - Ajouter le push vers un registry (GHCR, Docker Hub)
+#   - Ajouter des tests unitaires/integration
+#   - Ajouter un scan de vulnerabilites
+# =============================================================================
+
+name: ci
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout du code source
+      - uses: actions/checkout@v4
+
+      # 2. Setup Docker Buildx (BuildKit)
+      - uses: docker/setup-buildx-action@v3
+
+      # 3. Build de l'image Docker
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          tags: mini-api:1.0
+          load: true  # Charge l'image dans le Docker local (pas de push)
+
+      # 4. Test : demarrage du conteneur et verification
+      - name: Test
+        run: |
+          # Demarre le conteneur en arriere-plan
+          docker run -d -p 8000:8000 --name api mini-api:1.0
+          # Attends 3 secondes que l'application demarre
+          sleep 3
+          # Verifie que /health retourne 200
+          curl -f http://localhost:8000/health

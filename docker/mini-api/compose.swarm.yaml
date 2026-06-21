@@ -1,0 +1,117 @@
+# =============================================================================
+# compose.swarm.yaml — Configuration Docker Swarm pour deploiement distribue
+# =============================================================================
+#
+# OBJECTIF : Deploiement de l'API sur un cluster Docker Swarm avec :
+# - Secrets geres par Swarm (pas dans les variables d'environnement)
+# - Replicas multiples pour la haute disponibilite
+# - Rolling updates sans interruption de service
+# - Reseaux overlay pour la communication inter-nodes
+#
+# ARCHITECTURE :
+#   [Swarm Manager] → [Worker 1: api.1] → [db]
+#                   → [Worker 2: api.2] → [db]
+#                   → [Worker 3: api.3] → [db]
+#
+# RESULTAT ATTENDU :
+#   - 3 replicas de l'API repartis sur les workers
+#   - Secrets montes dans /run/secrets/ (fichiers temporaires)
+#   - Base de donnees sur un worker specifique
+#   - Rolling update : 1 replica a la fois, delai de 10s
+#
+# PRE-REQUIS :
+#   docker swarm init  # Initialiser le cluster Swarm
+#   printf 'app\n' | docker secret create db_password -
+#   printf 'change-me\n' | docker secret create jwt_secret -
+#   docker build -t mini-api:1.0 ./app
+#
+# USAGE :
+#   docker stack deploy -c compose.swarm.yaml mini
+#
+# VERIFICATION :
+#   docker stack services mini  # Doit afficher 2 services avec 3 replicas pour api
+#   docker service logs mini_api  # Logs de tous les replicas
+# =============================================================================
+
+version: "3.9"
+
+services:
+  # ---------------------------------------------------------------------------
+  # Service : Base de donnees PostgreSQL
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=app
+      - POSTGRES_DB=app_db
+      # Lecture du mot de passe depuis un secret Swarm
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+    secrets:
+      - db_password      # Monte le secret dans /run/secrets/db_password
+    deploy:
+      placement:
+        # Contrainte : le conteneur doit s'executer sur un worker (pas le manager)
+        constraints: ["node.role == worker"]
+    volumes:
+      - data_pg:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  # ---------------------------------------------------------------------------
+  # Service : API FastAPI
+  # ---------------------------------------------------------------------------
+  api:
+    image: mini-api:1.0  # Remplacer par REG/mini-api:1.0 en production
+    environment:
+      # NOTE : L'interpolation $(cat /run/secrets/...) n'est pas supportee nativement
+      # Solution : utiliser un wrapper d'entrypoint qui lit les secrets
+      - DATABASE_URL=postgresql+psycopg2://app:$(cat /run/secrets/db_password)@db:5432/app_db
+      - JWT_SECRET_FILE=/run/secrets/jwt_secret
+    secrets:
+      - jwt_secret       # Monte le secret JWT
+      - db_password      # Monte le secret DB
+    deploy:
+      replicas: 3        # 3 instances de l'API
+      update_config:
+        # Configuration du rolling update
+        parallelism: 1           # 1 replica a la fois
+        delay: 10s               # Delai de 10s entre chaque mise a jour
+        order: start-first       # Demarrer le nouveau avant d'arreter l'ancien
+      rollback_config:
+        # Configuration du rollback en cas d'echec
+        parallelism: 1
+        delay: 5s
+      resources:
+        # Limites de ressources par replica
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    ports:
+      - "8000:8000"
+    networks:
+      - frontend
+      - backend
+
+# -----------------------------------------------------------------------------
+# Secrets Swarm
+# -----------------------------------------------------------------------------
+secrets:
+  db_password:
+    external: true       # Secret cree manuellement avec 'docker secret create'
+  jwt_secret:
+    external: true
+
+# -----------------------------------------------------------------------------
+# Reseaux overlay (communication inter-nodes)
+# -----------------------------------------------------------------------------
+networks:
+  frontend:
+    driver: overlay      # Reseau distribue Swarm
+  backend:
+    driver: overlay
+
+# -----------------------------------------------------------------------------
+# Volumes
+# -----------------------------------------------------------------------------
+volumes:
+  data_pg: {}

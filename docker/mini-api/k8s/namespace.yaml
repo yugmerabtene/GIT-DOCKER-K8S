@@ -1,0 +1,23 @@
+# =============================================================================
+# namespace.yaml — Creation du namespace Kubernetes 'demo'
+# =============================================================================
+#
+# OBJECTIF : Creer un namespace isole pour le mini-projet.
+#
+# POURQUOI UN NAMESPACE ?
+# - Isolation logique des ressources (Pods, Services, Secrets)
+# - RBAC specifique au namespace
+# - Quotas de ressources par namespace
+# - Separation des environnements (dev, staging, prod)
+#
+# RESULTAT ATTENDU :
+#   kubectl get ns demo  # Doit afficher le namespace avec status "Active"
+#
+# USAGE :
+#   kubectl apply -f namespace.yaml
+# =============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo

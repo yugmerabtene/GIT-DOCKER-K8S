@@ -1,0 +1,33 @@
+# =============================================================================
+# postgres-service.yaml — Service headless pour PostgreSQL StatefulSet
+# =============================================================================
+#
+# OBJECTIF : Exposer PostgreSQL en interne avec un service headless.
+#
+# POURQUOI HEADLESS (clusterIP: None) ?
+# - Pas d'IP virtuelle (VIP)
+# - DNS retourne directement l'IP du Pod
+# - Format : <pod-name>.<service-name>.<namespace>.svc.cluster.local
+# - Exemple : postgres-0.postgres.demo.svc.cluster.local
+#
+# RESULTAT ATTENDU :
+#   kubectl get svc postgres -n demo  # Doit afficher clusterIP: None
+#   kubectl exec -it <pod> -n demo -- nslookup postgres.demo.svc.cluster.local
+#   # Doit retourner l'IP du pod postgres-0
+#
+# USAGE :
+#   kubectl apply -f postgres-service.yaml -n demo
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: demo
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres
+  clusterIP: None  # Service headless pour StatefulSet

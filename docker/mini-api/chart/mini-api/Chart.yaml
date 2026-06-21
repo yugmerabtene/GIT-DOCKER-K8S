@@ -1,0 +1,23 @@
+# =============================================================================
+# Chart.yaml — Metadonnees du Chart Helm
+# =============================================================================
+#
+# OBJECTIF : Definir les metadonnees du Chart Helm pour mini-api.
+#
+# CHAMPS :
+# - apiVersion : version de l'API Helm (v2 pour Helm 3+)
+# - name : nom du Chart
+# - version : version du Chart (incrementee a chaque modification)
+# - appVersion : version de l'application deployee
+# - description : description du Chart
+#
+# USAGE :
+#   helm lint chart/mini-api  # Validation du Chart
+#   helm template chart/mini-api  # Rendu des templates (sans deploiement)
+# =============================================================================
+
+apiVersion: v2
+name: mini-api
+version: 0.1.0
+appVersion: "1.0.0"
+description: Mini API FastAPI + Postgres

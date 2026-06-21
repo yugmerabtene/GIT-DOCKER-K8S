@@ -1,0 +1,47 @@
+# =============================================================================
+# compose.dev.yaml — Override pour le developpement rapide
+# =============================================================================
+#
+# OBJECTIF : Configuration de developpement avec :
+# - Bind mount du code source (pas besoin de rebuild apres modification)
+# - Mode --reload (redemarrage automatique d'Uvicorn)
+#
+# ARCHITECTURE :
+#   [Code source local] → bind mount → [Conteneur API]
+#   Modification du code → Uvicorn detecte → Redemarrage automatique
+#
+# RESULTAT ATTENDU :
+#   - Les modifications du code sont prises en compte immediatement
+#   - Pas besoin de reconstruire l'image apres chaque changement
+#
+# USAGE :
+#   docker compose -f compose.yaml -f compose.dev.yaml --env-file .env up -d
+#
+# VERIFICATION :
+#   # Modifier un fichier Python dans ./app
+#   docker compose logs -f api  # Doit afficher "Detected change, reloading..."
+# =============================================================================
+
+services:
+  api:
+    build:
+      context: ./app
+    volumes:
+      # Bind mount du code source
+      # Permet de modifier le code sans rebuild
+      # Format : [chemin-hote]:[chemin-conteneur]
+      - ./app:/app
+    environment:
+      # Variables d'environnement (heritees de compose.yaml + .env)
+      - DATABASE_URL=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+    command:
+      # Override de la commande CMD du Dockerfile
+      # --reload : active le mode developpement (watch des fichiers)
+      - uvicorn
+      - app.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --reload

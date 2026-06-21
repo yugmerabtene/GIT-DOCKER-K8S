@@ -1,0 +1,79 @@
+# =============================================================================
+# postgres-statefulset.yaml — StatefulSet pour PostgreSQL
+# =============================================================================
+#
+# OBJECTIF : Deployer PostgreSQL avec :
+# - Identite stable (nom de pod : postgres-0, postgres-1, ...)
+# - Volume persistant par replica (volumeClaimTemplates)
+# - Service headless pour la decouverte DNS
+#
+# POURQUOI STATEFULSET ?
+# - Base de donnees = etat a conserver (donnees, WAL, etc.)
+# - Chaque replica a son propre volume (pas de partage)
+# - Ordre de deploiement garanti (utile pour les clusters multi-nodes)
+#
+# RESULTAT ATTENDU :
+#   kubectl get statefulset postgres -n demo  # Doit afficher 1/1 READY
+#   kubectl get pod postgres-0 -n demo  # Doit afficher Running
+#   kubectl get pvc -n demo  # Doit afficher le PVC "data-postgres-0"
+#
+# USAGE :
+#   kubectl apply -f postgres-statefulset.yaml -n demo
+#
+# VERIFICATION :
+#   kubectl logs postgres-0 -n demo  # Logs de PostgreSQL
+#   kubectl exec -it postgres-0 -n demo -- psql -U app -d app_db  # Connexion DB
+# =============================================================================
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: demo
+spec:
+  serviceName: postgres  # Nom du service headless (pour DNS)
+  replicas: 1            # 1 replica (augmenter pour un cluster HA)
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            # Injection des secrets Kubernetes
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mini-secrets
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mini-secrets
+                  key: DB_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: mini-secrets
+                  key: DB_NAME
+          volumeMounts:
+            # Montage du volume persistant
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  # --- Volume Claim Templates ---
+  # Cree un PVC unique pour chaque replica du StatefulSet
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]  # Un seul node peut monter le volume
+        resources:
+          requests:
+            storage: 5Gi  # Taille du volume

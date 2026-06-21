@@ -1,0 +1,111 @@
+# =============================================================================
+# compose.yaml — Configuration Docker Compose pour Mini API (production-like)
+# =============================================================================
+#
+# OBJECTIF : Deploiement de l'API FastAPI + PostgreSQL avec :
+# - Healthchecks pour verifier l'etat des services
+# - Reseaux separes (frontend/backend) pour la securite
+# - Volume persistant pour la base de donnees
+# - Securite renforcee (read_only, tmpfs)
+#
+# ARCHITECTURE :
+#   [Client] → [api:8000] → [db:5432]
+#                 ↓
+#            [frontend network]
+#                 ↓
+#            [backend network (internal)]
+#
+# RESULTAT ATTENDU :
+#   - Conteneur 'db' : PostgreSQL 16, accessible uniquement depuis le backend
+#   - Conteneur 'api' : FastAPI, accessible depuis l'exterieur sur le port 8000
+#   - Volume 'data_pg' : persistance des donnees PostgreSQL
+#   - Healthchecks : Docker redemarre automatiquement les services en cas d'echec
+#
+# USAGE :
+#   docker compose up -d
+#   docker compose ps  # Doit afficher 2 services avec status "healthy"
+#   curl http://localhost:8000/health  # Doit retourner {"status":"ok"}
+#
+# VERIFICATION :
+#   docker compose logs -f api  # Logs de l'API en temps reel
+#   docker compose exec db psql -U app -d app_db  # Connexion a la DB
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Service : Base de donnees PostgreSQL
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16
+    environment:
+      # Variables d'environnement pour PostgreSQL
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    healthcheck:
+      # Verification de l'etat de PostgreSQL
+      # pg_isready : commande native PostgreSQL pour verifier si le serveur est pret
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s      # Verification toutes les 10 secondes
+      timeout: 3s        # Timeout de 3 secondes
+      retries: 10        # 10 tentatives avant de marquer comme "unhealthy"
+    volumes:
+      # Volume nomme pour la persistance des donnees
+      # Les donnees survivent aux redemarrages des conteneurs
+      - data_pg:/var/lib/postgresql/data
+    networks:
+      - backend          # Acces uniquement au reseau backend (isole)
+
+  # ---------------------------------------------------------------------------
+  # Service : API FastAPI
+  # ---------------------------------------------------------------------------
+  api:
+    build: ./app         # Construction de l'image depuis le repertoire ./app
+    environment:
+      # URL de connexion a la base de donnees
+      - DATABASE_URL=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      # Configuration JWT
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRE_MIN=${JWT_EXPIRE_MIN}
+    depends_on:
+      db:
+        condition: service_healthy  # Attends que la DB soit "healthy" avant de demarrer
+    healthcheck:
+      # Verification de l'etat de l'API
+      # wget -qO- : requete HTTP silencieuse vers /health
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 15s      # Verification toutes les 15 secondes
+      timeout: 5s        # Timeout de 5 secondes
+      retries: 5         # 5 tentatives avant de marquer comme "unhealthy"
+    ports:
+      # Publication du port 8000 sur l'hote
+      - "8000:8000"
+    read_only: true      # Systeme de fichiers en lecture seule (securite)
+    tmpfs:
+      # Repertoires temporaires en memoire (necessaires pour l'ecriture)
+      - /tmp             # Fichiers temporaires
+      - /run             # PID, sockets
+    networks:
+      - frontend         # Acces depuis l'exterieur
+      - backend          # Acces a la base de donnees
+
+# -----------------------------------------------------------------------------
+# Reseaux
+# -----------------------------------------------------------------------------
+networks:
+  # Reseau frontend : accessible depuis l'hote
+  frontend:
+    driver: bridge
+  # Reseau backend : interne, pas d'acces depuis l'exterieur
+  # Seuls les services sur ce reseau peuvent communiquer entre eux
+  backend:
+    driver: bridge
+    internal: true       # Pas de route vers l'exterieur
+
+# -----------------------------------------------------------------------------
+# Volumes
+# -----------------------------------------------------------------------------
+volumes:
+  # Volume pour les donnees PostgreSQL
+  # Cree automatiquement par Docker Compose
+  data_pg: {}
