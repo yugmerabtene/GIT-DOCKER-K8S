@@ -1,0 +1,49 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editeurs
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Fichiers temporaires
+*.tmp
+*.bak
+*.log
+
+# Environnements virtuels
+.env
+.env.local
+venv/
+.venv/
+
+# Node (si mini-projet)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python (si mini-projet)
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Docker (fichiers generes)
+*.tar
+
+# Kubeconfig (ne jamais committer de secrets)
+*.kubeconfig
+kubeconfig
+
+# Secrets
+*.pem
+*.key
+*.crt
